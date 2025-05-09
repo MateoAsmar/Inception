@@ -1,0 +1,62 @@
+version: "3.8"
+
+networks:
+  inception:
+    name: inception
+
+volumes:
+  wp_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/masmar/data/wp_data
+  db_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/masmar/data/db_data
+
+services:
+  nginx:
+    container_name: nginx
+    build: ./requirements/nginx
+    ports:
+      - target: 443
+        published: 443
+    volumes:
+      - wp_data:/var/www/html
+    networks:
+      - inception
+    depends_on:
+      - wordpress
+    restart: unless-stopped
+
+  wordpress:
+    container_name: wordpress
+    build: ./requirements/wordpress
+    env_file: .env
+    volumes:
+      - wp_data:/var/www/html
+    networks:
+      - inception
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    container_name: mariadb
+    build: ./requirements/mariadb
+    env_file: .env
+    networks:
+      - inception
+    healthcheck:
+      test: mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD} --silent
+      retries: 10
+      interval: 5s
+      timeout: 5s
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
